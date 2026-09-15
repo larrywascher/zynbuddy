@@ -5,7 +5,6 @@ import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
 import StoreList from "@/components/StoreList";
 import MapWrapper from "@/components/MapWrapper";
-import MockGPS from "@/components/MockGPS";
 import { useMapStore, type StoreResult } from "@/lib/store";
 
 export default function Home() {
@@ -23,6 +22,18 @@ export default function Home() {
     setCenter,
     setZoom,
   } = useMapStore();
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCenter([pos.coords.latitude, pos.coords.longitude]);
+        setZoom(12);
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [setCenter, setZoom]);
 
   const fetchStores = useCallback(async () => {
     setLoading(true);
@@ -100,7 +111,6 @@ export default function Home() {
           <MapWrapper stores={stores} onStoreSelect={handleStoreSelect} onStoreCreated={fetchStores} />
         </div>
       </div>
-      <MockGPS />
     </div>
   );
 }

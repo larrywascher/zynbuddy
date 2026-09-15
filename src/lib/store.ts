@@ -20,9 +20,9 @@ interface MapState {
 }
 
 export const useMapStore = create<MapState>((set) => ({
-  center: [33.3213, -111.6444],
-  zoom: 13,
-  radius: 10,
+  center: [39.8283, -98.5795],
+  zoom: 4,
+  radius: 25,
   maxPrice: 0,
   sortBy: "distance",
   productTypes: [],

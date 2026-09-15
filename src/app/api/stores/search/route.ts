@@ -4,9 +4,9 @@ import { haversineDistance, getBoundingBox } from "@/lib/geo";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const lat = parseFloat(searchParams.get("lat") || "33.3213");
-  const lng = parseFloat(searchParams.get("lng") || "-111.6444");
-  const radius = parseFloat(searchParams.get("radius") || "10");
+  const lat = parseFloat(searchParams.get("lat") || "39.8283");
+  const lng = parseFloat(searchParams.get("lng") || "-98.5795");
+  const radius = parseFloat(searchParams.get("radius") || "25");
   const sortBy = searchParams.get("sort") || "distance";
   const productTypes = searchParams.get("productTypes");
   const nicStrength = searchParams.get("nicStrength");

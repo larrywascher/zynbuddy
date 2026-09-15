@@ -1,43 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Search, SlidersHorizontal, X, Sparkles } from "lucide-react";
+import { Search, SlidersHorizontal, X, Sparkles, LocateFixed } from "lucide-react";
 import { useMapStore, PRODUCT_OPTIONS, STRENGTH_OPTIONS } from "@/lib/store";
 
-const ZIP_COORDS: Record<string, [number, number]> = {
-  "85120": [33.3893, -111.5483],
-  "85142": [33.3114, -111.5844],
-  "85201": [33.4152, -111.8315],
-  "85202": [33.4050, -111.8405],
-  "85203": [33.4350, -111.8105],
-  "85204": [33.3989, -111.7954],
-  "85205": [33.4213, -111.7278],
-  "85206": [33.3820, -111.7228],
-  "85207": [33.4213, -111.6728],
-  "85208": [33.3620, -111.6978],
-  "85209": [33.3620, -111.6478],
-  "85210": [33.3820, -111.8428],
-  "85211": [33.3950, -111.8100],
-  "85212": [33.3213, -111.6444],
-  "85213": [33.4213, -111.6228],
-  "85215": [33.4600, -111.6800],
-  "85216": [33.3800, -111.8300],
-  "85224": [33.3060, -111.8430],
-  "85225": [33.3060, -111.8100],
-  "85233": [33.3530, -111.7890],
-  "85234": [33.3530, -111.7500],
-  "85236": [33.3200, -111.7200],
-  "85249": [33.2580, -111.7700],
-  "85286": [33.3780, -111.9180],
-  "85296": [33.2890, -111.7600],
-  "85297": [33.2700, -111.6800],
-  "85298": [33.2800, -111.6400],
-  "85295": [33.3100, -111.7300],
-};
-
 export default function SearchBar() {
-  const [zipCode, setZipCode] = useState("85212");
+  const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [locating, setLocating] = useState(false);
   const {
     radius,
     maxPrice,
@@ -55,13 +25,45 @@ export default function SearchBar() {
     setOnlyWithPrices,
   } = useMapStore();
 
-  function handleSearch(e: React.FormEvent) {
+  async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const coords = ZIP_COORDS[zipCode];
-    if (coords) {
-      setCenter(coords);
-      setZoom(13);
+    const q = query.trim();
+    if (!q) return;
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+          new URLSearchParams({
+            q: q,
+            format: "json",
+            countrycodes: "us",
+            limit: "1",
+          }),
+        { headers: { "User-Agent": "ZynBuddy/1.0" } }
+      );
+      const results = await res.json();
+      if (results.length > 0) {
+        const { lat, lon } = results[0];
+        setCenter([parseFloat(lat), parseFloat(lon)]);
+        setZoom(12);
+      }
+    } catch {
+      // geocoding failed silently
     }
+  }
+
+  function handleLocate() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCenter([pos.coords.latitude, pos.coords.longitude]);
+        setZoom(12);
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }
 
   function toggleProduct(value: string) {
@@ -81,9 +83,9 @@ export default function SearchBar() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            value={zipCode}
-            onChange={(e) => setZipCode(e.target.value)}
-            placeholder="Enter ZIP code (e.g. 85212)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search city, ZIP, or address"
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 dark:text-white transition-shadow shadow-sm"
           />
         </div>
@@ -92,6 +94,19 @@ export default function SearchBar() {
           className="btn-primary px-5 py-2.5 text-sm"
         >
           Search
+        </button>
+        <button
+          type="button"
+          onClick={handleLocate}
+          disabled={locating}
+          title="Use my location"
+          className={`p-2.5 border rounded-xl transition-all shadow-sm ${
+            locating
+              ? "border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse"
+              : "border-gray-200 dark:border-gray-600 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-400"
+          }`}
+        >
+          <LocateFixed className={`h-4 w-4 ${locating ? "text-green-500" : "text-gray-500 dark:text-gray-400"}`} />
         </button>
         <button
           type="button"
@@ -120,14 +135,14 @@ export default function SearchBar() {
           <input
             type="range"
             min={5}
-            max={25}
+            max={50}
             step={5}
             value={radius}
             onChange={(e) => setRadius(parseInt(e.target.value))}
             className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 accent-green-600"
           />
           <div className="flex justify-between mt-0.5">
-            {[5, 10, 15, 20, 25].map((v) => (
+            {[5, 10, 25, 50].map((v) => (
               <span key={v} className={`text-[9px] ${radius === v ? "text-green-600 font-bold" : "text-gray-400"}`}>{v}</span>
             ))}
           </div>
