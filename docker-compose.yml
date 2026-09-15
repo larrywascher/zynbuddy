@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: zynbuddy-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: zynbuddy
+      POSTGRES_PASSWORD: zynbuddy_dev
+      POSTGRES_DB: zynbuddy
+    volumes:
+      - zynbuddy-pgdata:/var/lib/postgresql/data
+
+volumes:
+  zynbuddy-pgdata:

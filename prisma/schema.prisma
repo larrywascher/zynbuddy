@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String          @id @default(cuid())
+  email            String          @unique
+  name             String?
+  firstName        String?
+  lastName         String?
+  phone            String?
+  passwordHash     String
+  role             String          @default("USER")
+  emailVerified    Boolean         @default(false)
+  isSuspended      Boolean         @default(false)
+  suspendedReason  String?
+  suspendedUntil   DateTime?
+  rewardPoints     Int             @default(0)
+  trustScore       Float           @default(0)
+  totalUpvotes     Int             @default(0)
+  totalSubmissions Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  priceReports     PriceReport[]
+  reviews          Review[]
+  rewardsLedger    RewardsLedger[]
+  productRequests  ProductRequest[]
+  priceVotes       PriceVote[]
+  auditLogs        AuditLog[]
+  emailTokens      EmailVerification[]
+}
+
+model Store {
+  id          String         @id @default(cuid())
+  name        String
+  brand       String?
+  address     String
+  city        String
+  state       String
+  zipCode     String
+  latitude    Float
+  longitude   Float
+  phone       String?
+  storeType   String         @default("GAS_STATION")
+  isVerified  Boolean        @default(false)
+  addedByUser String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  prices      PriceReport[]
+  amenities   StoreAmenity[]
+  reviews     Review[]
+
+  @@index([latitude, longitude])
+  @@index([zipCode])
+  @@index([storeType])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  type        String   @unique
+  label       String
+  category    String   @default("NICOTINE_POUCH")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model PriceReport {
+  id              String      @id @default(cuid())
+  storeId         String
+  userId          String
+  productType     String      @default("ZYN")
+  productBrand    String      @default("Zyn")
+  productVariant  String?
+  nicStrength     String?
+  pricePerCan     Float
+  pricePerRoll    Float?
+  dealDescription String?
+  confirmedCount  Int         @default(0)
+  inaccurateCount Int         @default(0)
+  isStale         Boolean     @default(false)
+  status          String      @default("ACTIVE")
+  verifiedByUserId String?
+  lastConfirmedAt DateTime?
+  createdAt       DateTime    @default(now())
+  store           Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes           PriceVote[]
+
+  @@index([storeId, productType, status, isStale])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([pricePerCan])
+}
+
+model PriceVote {
+  id            String   @id @default(cuid())
+  priceReportId String
+  userId        String
+  voteType      String
+  createdAt     DateTime @default(now())
+  priceReport   PriceReport @relation(fields: [priceReportId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([priceReportId, userId])
+  @@index([userId])
+}
+
+model StoreAmenity {
+  id      String @id @default(cuid())
+  storeId String
+  name    String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, name])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([userId])
+}
+
+model RewardsLedger {
+  id          String   @id @default(cuid())
+  userId      String
+  points      Int
+  reason      String
+  referenceId String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ProductRequest {
+  id           String   @id @default(cuid())
+  userId       String
+  brandName    String
+  productType  String?
+  description  String?
+  voteCount    Int      @default(1)
+  status       String   @default("PENDING")
+  adminNote    String?
+  reviewedAt   DateTime?
+  reviewedById String?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String
+  count     Int      @default(0)
+  windowStart DateTime @default(now())
+
+  @@unique([key])
+}
+
+model EmailVerification {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  targetType String?
+  targetId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([targetType, targetId])
+}
