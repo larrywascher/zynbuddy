@@ -308,10 +308,10 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
                 <h3 className="font-bold text-sm mb-1">Add New Store</h3>
                 {geocoding ? (
                   <p className="text-xs text-gray-400 py-2 text-center">Looking up location...</p>
-                ) : (
+                ) : geoData.name ? (
                   <form onSubmit={handleSubmitNewStore} className="space-y-1.5">
                     <div className="text-xs">
-                      <p className="font-semibold text-gray-800">{geoData.name || "Unknown location"}</p>
+                      <p className="font-semibold text-gray-800">{geoData.name}</p>
                       <p className="text-gray-500">{geoData.address || `${clickedPos[0].toFixed(4)}, ${clickedPos[1].toFixed(4)}`}</p>
                       {geoData.city && <p className="text-gray-500">{geoData.city}{geoData.state ? `, ${geoData.state}` : ""} {geoData.zip}</p>}
                     </div>
@@ -324,6 +324,11 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
                       {submitting ? "Adding..." : "Add Store & Report Price"}
                     </button>
                   </form>
+                ) : (
+                  <div className="text-xs text-center py-1">
+                    <p className="text-gray-500">No business found at this location.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Try tapping on or near a store.</p>
+                  </div>
                 )}
                 {message && (
                   <p className={`text-[10px] mt-1 ${message.includes("Failed") ? "text-red-500" : "text-green-600"}`}>
