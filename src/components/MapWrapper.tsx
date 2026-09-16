@@ -20,8 +20,10 @@ interface MapWrapperProps {
   onStoreSelect: (store: StoreResult) => void;
   onStoreCreated?: () => void;
   userPosition?: [number, number] | null;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-export default function MapWrapper({ stores, onStoreSelect, onStoreCreated, userPosition }: MapWrapperProps) {
-  return <MapView stores={stores} onStoreSelect={onStoreSelect} onStoreCreated={onStoreCreated} userPosition={userPosition} />;
+export default function MapWrapper({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand }: MapWrapperProps) {
+  return <MapView stores={stores} onStoreSelect={onStoreSelect} onStoreCreated={onStoreCreated} userPosition={userPosition} isExpanded={isExpanded} onToggleExpand={onToggleExpand} />;
 }

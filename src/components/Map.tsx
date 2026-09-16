@@ -7,6 +7,7 @@ import {
   Marker,
   Popup,
   CircleMarker,
+  Pane,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -14,6 +15,7 @@ import L from "leaflet";
 import type { StoreResult } from "@/lib/store";
 import { useMapStore, PRODUCT_OPTIONS } from "@/lib/store";
 import Link from "next/link";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 function getPriceColor(price: number | null | undefined): string {
@@ -139,9 +141,11 @@ interface MapViewProps {
   onStoreSelect: (store: StoreResult) => void;
   onStoreCreated?: () => void;
   userPosition?: [number, number] | null;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-export default function MapView({ stores, onStoreSelect, onStoreCreated, userPosition }: MapViewProps) {
+export default function MapView({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand }: MapViewProps) {
   const center = useMapStore((s) => s.center);
   const zoom = useMapStore((s) => s.zoom);
   const productTypes = useMapStore((s) => s.productTypes);
@@ -232,20 +236,22 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
         {session && <MapClickHandler onMapClick={handleMapClick} />}
 
         {userPosition && (
-          <CircleMarker
-            center={userPosition}
-            radius={8}
-            pathOptions={{
-              color: "#ffffff",
-              weight: 3,
-              fillColor: "#3b82f6",
-              fillOpacity: 1,
-            }}
-          >
-            <Popup>
-              <p className="text-xs font-medium">Your location</p>
-            </Popup>
-          </CircleMarker>
+          <Pane name="user-position" style={{ zIndex: 700 }}>
+            <CircleMarker
+              center={userPosition}
+              radius={8}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 3,
+                fillColor: "#3b82f6",
+                fillOpacity: 1,
+              }}
+            >
+              <Popup>
+                <p className="text-xs font-medium">Your location</p>
+              </Popup>
+            </CircleMarker>
+          </Pane>
         )}
 
         {stores.map((store) => (
@@ -339,13 +345,28 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
         )}
       </MapContainer>
 
-      {session && (
-        <div className="absolute top-3 right-3 z-[1000] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
-            Tap map to add a store
-          </p>
-        </div>
-      )}
+      <div className="absolute top-3 right-3 z-[1000] flex items-center gap-2">
+        {session && (
+          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
+            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+              Tap map to add a store
+            </p>
+          </div>
+        )}
+        {onToggleExpand && (
+          <button
+            onClick={onToggleExpand}
+            className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl p-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-700 transition-colors"
+            title={isExpanded ? "Collapse map" : "Expand map"}
+          >
+            {isExpanded ? (
+              <Minimize2 className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+            ) : (
+              <Maximize2 className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

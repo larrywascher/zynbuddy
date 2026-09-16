@@ -66,17 +66,19 @@ export default function SearchBar() {
     );
   }
 
-  function radiusToZoom(miles: number): number {
+  function diameterToZoom(miles: number): number {
+    if (miles <= 1) return 16;
+    if (miles <= 2) return 15;
+    if (miles <= 3) return 14;
     if (miles <= 5) return 13;
-    if (miles <= 10) return 12;
-    if (miles <= 15) return 11;
-    if (miles <= 20) return 10;
+    if (miles <= 8) return 12;
+    if (miles <= 12) return 11;
     return 10;
   }
 
   function setRadius(r: number) {
     setRadiusRaw(r);
-    setZoom(radiusToZoom(r));
+    setZoom(diameterToZoom(r));
   }
 
   function toggleProduct(value: string) {
@@ -147,15 +149,15 @@ export default function SearchBar() {
           </div>
           <input
             type="range"
-            min={5}
-            max={25}
-            step={5}
+            min={1}
+            max={20}
+            step={1}
             value={radius}
             onChange={(e) => setRadius(parseInt(e.target.value))}
             className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 accent-green-600"
           />
           <div className="flex justify-between mt-0.5">
-            {[5, 10, 15, 20, 25].map((v) => (
+            {[1, 5, 10, 15, 20].map((v) => (
               <span key={v} className={`text-[9px] ${radius === v ? "text-green-600 font-bold" : "text-gray-400"}`}>{v}</span>
             ))}
           </div>
@@ -169,14 +171,14 @@ export default function SearchBar() {
           <input
             type="range"
             min={0}
-            max={20}
+            max={15}
             step={1}
             value={maxPrice}
             onChange={(e) => setMaxPrice(parseInt(e.target.value))}
             className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 accent-green-600"
           />
           <div className="flex justify-between mt-0.5">
-            {[0, 5, 10, 15, 20].map((v) => (
+            {[0, 5, 10, 15].map((v) => (
               <span key={v} className={`text-[9px] ${maxPrice === v ? "text-green-600 font-bold" : "text-gray-400"}`}>{v === 0 ? "Any" : `$${v}`}</span>
             ))}
           </div>

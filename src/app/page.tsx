@@ -47,7 +47,7 @@ export default function Home() {
       const params = new URLSearchParams({
         lat: center[0].toString(),
         lng: center[1].toString(),
-        radius: radius.toString(),
+        radius: (radius / 2).toString(),
         sort: sortBy,
       });
       if (productTypes.length > 0) {
@@ -164,7 +164,7 @@ export default function Home() {
         <div
           className={`p-1.5 transition-all ${
             mobileView === "list"
-              ? "h-[20vh] lg:h-auto lg:flex-1"
+              ? "h-[25vh] lg:h-auto lg:flex-1"
               : "flex-1 min-h-[60vh] lg:min-h-0"
           }`}
         >
@@ -173,6 +173,8 @@ export default function Home() {
             onStoreSelect={handleStoreSelect}
             onStoreCreated={fetchStores}
             userPosition={userPosition}
+            isExpanded={mobileView === "map"}
+            onToggleExpand={() => setMobileView(mobileView === "map" ? "list" : "map")}
           />
         </div>
       </div>
