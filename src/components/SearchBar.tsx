@@ -24,12 +24,36 @@ export default function SearchBar() {
   const setOnlyWithPrices = useMapStore((s) => s.setOnlyWithPrices);
   const setUserPosition = useMapStore((s) => s.setUserPosition);
 
-  async function nominatimSearch(params: Record<string, string>): Promise<Record<string, unknown>[]> {
+  async function photonSearch(q: string): Promise<{ lat: number; lng: number; isStreetLevel: boolean } | null> {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?` + new URLSearchParams(params),
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lang=en&layer=house,street,city,state`,
       { headers: { "User-Agent": "ZynBuddy/1.0" } }
     );
-    return res.json();
+    const data = await res.json();
+    const features = data.features as Array<{
+      properties: { type?: string; countrycode?: string };
+      geometry: { coordinates: [number, number] };
+    }>;
+    const usResults = features?.filter((f) => f.properties.countrycode === "US");
+    if (!usResults?.length) return null;
+    const best = usResults[0];
+    const [lon, lat] = best.geometry.coordinates;
+    const isStreetLevel = best.properties.type === "house" || best.properties.type === "building";
+    return { lat, lng: lon, isStreetLevel };
+  }
+
+  async function nominatimFallback(q: string): Promise<{ lat: number; lng: number; isStreetLevel: boolean } | null> {
+    const base = { format: "json", countrycodes: "us", limit: "5", addressdetails: "1" };
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?` + new URLSearchParams({ ...base, q }),
+      { headers: { "User-Agent": "ZynBuddy/1.0" } }
+    );
+    const results = await res.json();
+    if (!results?.length) return null;
+    const best = results[0];
+    const addr = best.address as Record<string, string> | undefined;
+    const isStreetLevel = best.type === "house" || best.type === "building" || !!addr?.house_number;
+    return { lat: parseFloat(best.lat), lng: parseFloat(best.lon), isStreetLevel };
   }
 
   async function handleSearch(e: React.FormEvent) {
@@ -38,40 +62,24 @@ export default function SearchBar() {
     if (!q) return;
 
     try {
-      const base = { format: "json", countrycodes: "us", limit: "5", addressdetails: "1" };
-      let results: Record<string, unknown>[] = [];
+      let result = await photonSearch(q);
 
-      const addressMatch = q.match(/^(\d+\s+.+?),\s*(.+?),\s*([A-Z]{2})\s*(\d{5})?$/i);
-      if (addressMatch) {
-        const structured: Record<string, string> = {
-          ...base,
-          street: addressMatch[1],
-          city: addressMatch[2],
-          state: addressMatch[3],
-        };
-        if (addressMatch[4]) structured.postalcode = addressMatch[4];
-        results = await nominatimSearch(structured);
-
-        if (results.length === 0) {
-          results = await nominatimSearch({ ...base, q });
-        }
-
-        if (results.length === 0) {
-          const fallback = addressMatch[4] || `${addressMatch[2]}, ${addressMatch[3]}`;
-          results = await nominatimSearch({ ...base, q: fallback });
-        }
-      } else {
-        results = await nominatimSearch({ ...base, q });
+      if (!result) {
+        result = await nominatimFallback(q);
       }
 
-      if (results.length > 0) {
-        const best = results[0];
-        const coords: [number, number] = [parseFloat(best.lat as string), parseFloat(best.lon as string)];
+      if (!result) {
+        const zipMatch = q.match(/(\d{5})/);
+        const cityStateMatch = q.match(/([A-Za-z\s]+),\s*([A-Z]{2})/i);
+        const fallbackQ = zipMatch?.[1] || (cityStateMatch ? `${cityStateMatch[1]}, ${cityStateMatch[2]}` : null);
+        if (fallbackQ) result = await nominatimFallback(fallbackQ);
+      }
+
+      if (result) {
+        const coords: [number, number] = [result.lat, result.lng];
         setCenter(coords);
         setUserPosition(coords);
-        const addr = best.address as Record<string, string> | undefined;
-        const isStreetLevel = best.type === "house" || best.type === "building" || addr?.house_number;
-        setZoom(isStreetLevel ? 16 : 13);
+        setZoom(result.isStreetLevel ? 16 : 13);
       }
     } catch {
       // geocoding failed silently
