@@ -16,7 +16,7 @@ export default function SearchBar() {
     nicStrength,
     onlyWithPrices,
     setCenter,
-    setRadius,
+    setRadius: setRadiusRaw,
     setMaxPrice,
     setSortBy,
     setZoom,
@@ -64,6 +64,19 @@ export default function SearchBar() {
       () => setLocating(false),
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  }
+
+  function radiusToZoom(miles: number): number {
+    if (miles <= 5) return 13;
+    if (miles <= 10) return 12;
+    if (miles <= 15) return 11;
+    if (miles <= 20) return 10;
+    return 10;
+  }
+
+  function setRadius(r: number) {
+    setRadiusRaw(r);
+    setZoom(radiusToZoom(r));
   }
 
   function toggleProduct(value: string) {
@@ -135,14 +148,14 @@ export default function SearchBar() {
           <input
             type="range"
             min={5}
-            max={50}
+            max={25}
             step={5}
             value={radius}
             onChange={(e) => setRadius(parseInt(e.target.value))}
             className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 accent-green-600"
           />
           <div className="flex justify-between mt-0.5">
-            {[5, 10, 25, 50].map((v) => (
+            {[5, 10, 15, 20, 25].map((v) => (
               <span key={v} className={`text-[9px] ${radius === v ? "text-green-600 font-bold" : "text-gray-400"}`}>{v}</span>
             ))}
           </div>

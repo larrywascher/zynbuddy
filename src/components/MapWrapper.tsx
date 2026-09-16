@@ -19,8 +19,9 @@ interface MapWrapperProps {
   stores: StoreResult[];
   onStoreSelect: (store: StoreResult) => void;
   onStoreCreated?: () => void;
+  userPosition?: [number, number] | null;
 }
 
-export default function MapWrapper({ stores, onStoreSelect, onStoreCreated }: MapWrapperProps) {
-  return <MapView stores={stores} onStoreSelect={onStoreSelect} onStoreCreated={onStoreCreated} />;
+export default function MapWrapper({ stores, onStoreSelect, onStoreCreated, userPosition }: MapWrapperProps) {
+  return <MapView stores={stores} onStoreSelect={onStoreSelect} onStoreCreated={onStoreCreated} userPosition={userPosition} />;
 }

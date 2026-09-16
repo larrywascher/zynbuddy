@@ -6,12 +6,13 @@ import {
   TileLayer,
   Marker,
   Popup,
+  CircleMarker,
   useMap,
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import type { StoreResult } from "@/lib/store";
-import { useMapStore, PRODUCT_OPTIONS, STRENGTH_OPTIONS } from "@/lib/store";
+import { useMapStore, PRODUCT_OPTIONS } from "@/lib/store";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
@@ -71,22 +72,28 @@ function MapUpdater() {
   const map = useMap();
   const center = useMapStore((s) => s.center);
   const zoom = useMapStore((s) => s.zoom);
+  const setMapBounds = useMapStore((s) => s.setMapBounds);
 
   useEffect(() => {
     map.setView(center, zoom);
   }, [map, center, zoom]);
 
-  return null;
-}
+  useEffect(() => {
+    function updateBounds() {
+      const b = map.getBounds();
+      setMapBounds({
+        minLat: b.getSouth(),
+        maxLat: b.getNorth(),
+        minLng: b.getWest(),
+        maxLng: b.getEast(),
+      });
+    }
+    updateBounds();
+    map.on("moveend", updateBounds);
+    return () => { map.off("moveend", updateBounds); };
+  }, [map, setMapBounds]);
 
-interface AddStoreFormData {
-  name: string;
-  address: string;
-  productType: string;
-  productBrand: string;
-  pricePerCan: string;
-  nicStrength: string;
-  storeType: string;
+  return null;
 }
 
 function MapClickHandler({
@@ -102,13 +109,13 @@ function MapClickHandler({
   return null;
 }
 
-async function reverseGeocode(lat: number, lng: number): Promise<{ name: string; address: string }> {
+async function reverseGeocode(lat: number, lng: number): Promise<{ name: string; address: string; city: string; state: string; zip: string }> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
       { headers: { "User-Agent": "ZynBuddy/1.0" } }
     );
-    if (!res.ok) return { name: "", address: "" };
+    if (!res.ok) return { name: "", address: "", city: "", state: "", zip: "" };
     const data = await res.json();
 
     const name = data.name || data.address?.shop || data.address?.amenity || data.address?.building || "";
@@ -116,13 +123,14 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ name: string;
     const addr = data.address || {};
     if (addr.house_number && addr.road) parts.push(`${addr.house_number} ${addr.road}`);
     else if (addr.road) parts.push(addr.road);
-    if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
-    if (addr.state) parts.push(addr.state);
-    if (addr.postcode) parts.push(addr.postcode);
 
-    return { name, address: parts.join(", ") };
+    const city = addr.city || addr.town || addr.village || "";
+    const state = addr.state || "";
+    const zip = addr.postcode || "";
+
+    return { name, address: parts.join(", "), city, state, zip };
   } catch {
-    return { name: "", address: "" };
+    return { name: "", address: "", city: "", state: "", zip: "" };
   }
 }
 
@@ -130,24 +138,18 @@ interface MapViewProps {
   stores: StoreResult[];
   onStoreSelect: (store: StoreResult) => void;
   onStoreCreated?: () => void;
+  userPosition?: [number, number] | null;
 }
 
-export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapViewProps) {
+export default function MapView({ stores, onStoreSelect, onStoreCreated, userPosition }: MapViewProps) {
   const center = useMapStore((s) => s.center);
   const zoom = useMapStore((s) => s.zoom);
   const productTypes = useMapStore((s) => s.productTypes);
   const { data: session } = useSession();
   const [clickedPos, setClickedPos] = useState<[number, number] | null>(null);
   const [geocoding, setGeocoding] = useState(false);
-  const [formData, setFormData] = useState<AddStoreFormData>({
-    name: "",
-    address: "",
-    productType: "ZYN",
-    productBrand: "Zyn",
-    pricePerCan: "",
-    nicStrength: "",
-    storeType: "GAS_STATION",
-  });
+  const [geoData, setGeoData] = useState({ name: "", address: "", city: "", state: "", zip: "" });
+  const [pricePerCan, setPricePerCan] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const markerRef = useRef<L.Marker>(null);
@@ -156,15 +158,12 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapVi
     if (!session) return;
     setClickedPos([lat, lng]);
     setMessage("");
+    setPricePerCan("");
     setGeocoding(true);
-    setFormData((prev) => ({ ...prev, name: "", address: "" }));
+    setGeoData({ name: "", address: "", city: "", state: "", zip: "" });
 
     const geo = await reverseGeocode(lat, lng);
-    setFormData((prev) => ({
-      ...prev,
-      name: geo.name,
-      address: geo.address,
-    }));
+    setGeoData(geo);
     setGeocoding(false);
 
     setTimeout(() => {
@@ -178,21 +177,21 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapVi
     setSubmitting(true);
     setMessage("");
 
-    const product = PRODUCT_OPTIONS.find((p) => p.value === formData.productType);
-
     const res = await fetch("/api/stores/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: formData.name,
-        address: formData.address,
+        name: geoData.name || "Store",
+        address: geoData.address,
+        city: geoData.city,
+        state: geoData.state,
+        zipCode: geoData.zip,
         latitude: clickedPos[0],
         longitude: clickedPos[1],
-        storeType: formData.storeType,
-        productType: formData.productType,
-        productBrand: product?.label || formData.productBrand,
-        pricePerCan: formData.pricePerCan,
-        nicStrength: formData.nicStrength || undefined,
+        storeType: "GAS_STATION",
+        productType: "ZYN",
+        productBrand: "Zyn",
+        pricePerCan,
       }),
     });
 
@@ -200,7 +199,8 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapVi
     if (res.ok) {
       setMessage("Store added! +50 points");
       setClickedPos(null);
-      setFormData({ name: "", address: "", productType: "ZYN", productBrand: "Zyn", pricePerCan: "", nicStrength: "", storeType: "GAS_STATION" });
+      setPricePerCan("");
+      setGeoData({ name: "", address: "", city: "", state: "", zip: "" });
       onStoreCreated?.();
     } else {
       const data = await res.json();
@@ -222,7 +222,7 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapVi
         center={center}
         zoom={zoom}
         className="h-full w-full rounded-2xl shadow-inner"
-        style={{ minHeight: "400px" }}
+        style={{ minHeight: "300px" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -230,6 +230,24 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapVi
         />
         <MapUpdater />
         {session && <MapClickHandler onMapClick={handleMapClick} />}
+
+        {userPosition && (
+          <CircleMarker
+            center={userPosition}
+            radius={8}
+            pathOptions={{
+              color: "#ffffff",
+              weight: 3,
+              fillColor: "#3b82f6",
+              fillOpacity: 1,
+            }}
+          >
+            <Popup>
+              <p className="text-xs font-medium">Your location</p>
+            </Popup>
+          </CircleMarker>
+        )}
+
         {stores.map((store) => (
           <Marker
             key={store.id}
@@ -275,73 +293,32 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapVi
             ref={markerRef}
           >
             <Popup>
-              <div className="min-w-56">
+              <div className="min-w-52">
                 <h3 className="font-bold text-sm mb-1">Add New Store</h3>
-                <p className="text-[10px] text-gray-500 mb-2">
-                  {clickedPos[0].toFixed(4)}, {clickedPos[1].toFixed(4)}
-                </p>
                 {geocoding ? (
                   <p className="text-xs text-gray-400 py-2 text-center">Looking up location...</p>
                 ) : (
                   <form onSubmit={handleSubmitNewStore} className="space-y-1.5">
-                    <input
-                      type="text"
-                      placeholder="Store name *"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
-                      className="w-full px-2 py-1 text-xs border rounded"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Address"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className="w-full px-2 py-1 text-xs border rounded"
-                    />
-                    <select
-                      value={formData.storeType}
-                      onChange={(e) => setFormData({ ...formData, storeType: e.target.value })}
-                      className="w-full px-2 py-1 text-xs border rounded"
-                    >
-                      <option value="GAS_STATION">Gas Station</option>
-                      <option value="CONVENIENCE_STORE">Convenience Store</option>
-                      <option value="SMOKE_SHOP">Smoke Shop</option>
-                      <option value="GROCERY">Grocery</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                    <select
-                      value={formData.productType}
-                      onChange={(e) => {
-                        const opt = PRODUCT_OPTIONS.find((p) => p.value === e.target.value);
-                        setFormData({ ...formData, productType: e.target.value, productBrand: opt?.label || e.target.value });
-                      }}
-                      className="w-full px-2 py-1 text-xs border rounded"
-                    >
-                      {PRODUCT_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={formData.nicStrength}
-                      onChange={(e) => setFormData({ ...formData, nicStrength: e.target.value })}
-                      className="w-full px-2 py-1 text-xs border rounded"
-                    >
-                      {STRENGTH_OPTIONS.map((s) => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      max="100"
-                      placeholder="Price per can ($) *"
-                      value={formData.pricePerCan}
-                      onChange={(e) => setFormData({ ...formData, pricePerCan: e.target.value })}
-                      required
-                      className="w-full px-2 py-1 text-xs border rounded"
-                    />
+                    <div className="text-xs">
+                      <p className="font-semibold text-gray-800">{geoData.name || "Unknown location"}</p>
+                      <p className="text-gray-500">{geoData.address || `${clickedPos[0].toFixed(4)}, ${clickedPos[1].toFixed(4)}`}</p>
+                      {geoData.city && <p className="text-gray-500">{geoData.city}{geoData.state ? `, ${geoData.state}` : ""} {geoData.zip}</p>}
+                    </div>
+                    <div className="pt-1">
+                      <label className="text-[10px] font-semibold text-gray-500 uppercase">Price per can ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        max="100"
+                        placeholder="e.g. 5.49"
+                        value={pricePerCan}
+                        onChange={(e) => setPricePerCan(e.target.value)}
+                        required
+                        className="w-full px-2 py-1.5 text-sm border rounded mt-0.5 font-medium"
+                        autoFocus
+                      />
+                    </div>
                     <button
                       type="submit"
                       disabled={submitting}
@@ -365,7 +342,7 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated }: MapVi
       {session && (
         <div className="absolute top-3 right-3 z-[1000] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
           <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
-            Click map to add a store
+            Tap map to add a store
           </p>
         </div>
       )}

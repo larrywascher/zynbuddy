@@ -1,5 +1,12 @@
 import { create } from "zustand";
 
+export interface MapBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
 interface MapState {
   center: [number, number];
   zoom: number;
@@ -9,6 +16,7 @@ interface MapState {
   productTypes: string[];
   nicStrength: string;
   onlyWithPrices: boolean;
+  mapBounds: MapBounds | null;
   setCenter: (center: [number, number]) => void;
   setZoom: (zoom: number) => void;
   setRadius: (radius: number) => void;
@@ -17,17 +25,19 @@ interface MapState {
   setProductTypes: (types: string[]) => void;
   setNicStrength: (strength: string) => void;
   setOnlyWithPrices: (v: boolean) => void;
+  setMapBounds: (bounds: MapBounds) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
   center: [39.8283, -98.5795],
   zoom: 4,
-  radius: 25,
+  radius: 10,
   maxPrice: 0,
   sortBy: "distance",
   productTypes: [],
   nicStrength: "",
   onlyWithPrices: false,
+  mapBounds: null,
   setCenter: (center) => set({ center }),
   setZoom: (zoom) => set({ zoom }),
   setRadius: (radius) => set({ radius }),
@@ -36,6 +46,7 @@ export const useMapStore = create<MapState>((set) => ({
   setProductTypes: (productTypes) => set({ productTypes }),
   setNicStrength: (nicStrength) => set({ nicStrength }),
   setOnlyWithPrices: (onlyWithPrices) => set({ onlyWithPrices }),
+  setMapBounds: (mapBounds) => set({ mapBounds }),
 }));
 
 export interface StoreResult {
