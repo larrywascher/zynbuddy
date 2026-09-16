@@ -24,29 +24,54 @@ export default function SearchBar() {
   const setOnlyWithPrices = useMapStore((s) => s.setOnlyWithPrices);
   const setUserPosition = useMapStore((s) => s.setUserPosition);
 
+  async function nominatimSearch(params: Record<string, string>): Promise<Record<string, unknown>[]> {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?` + new URLSearchParams(params),
+      { headers: { "User-Agent": "ZynBuddy/1.0" } }
+    );
+    return res.json();
+  }
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const q = query.trim();
     if (!q) return;
 
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?` +
-          new URLSearchParams({
-            q: q,
-            format: "json",
-            countrycodes: "us",
-            limit: "1",
-          }),
-        { headers: { "User-Agent": "ZynBuddy/1.0" } }
-      );
-      const results = await res.json();
+      const base = { format: "json", countrycodes: "us", limit: "5", addressdetails: "1" };
+      let results: Record<string, unknown>[] = [];
+
+      const addressMatch = q.match(/^(\d+\s+.+?),\s*(.+?),\s*([A-Z]{2})\s*(\d{5})?$/i);
+      if (addressMatch) {
+        const structured: Record<string, string> = {
+          ...base,
+          street: addressMatch[1],
+          city: addressMatch[2],
+          state: addressMatch[3],
+        };
+        if (addressMatch[4]) structured.postalcode = addressMatch[4];
+        results = await nominatimSearch(structured);
+
+        if (results.length === 0) {
+          results = await nominatimSearch({ ...base, q });
+        }
+
+        if (results.length === 0) {
+          const fallback = addressMatch[4] || `${addressMatch[2]}, ${addressMatch[3]}`;
+          results = await nominatimSearch({ ...base, q: fallback });
+        }
+      } else {
+        results = await nominatimSearch({ ...base, q });
+      }
+
       if (results.length > 0) {
-        const { lat, lon } = results[0];
-        const coords: [number, number] = [parseFloat(lat), parseFloat(lon)];
+        const best = results[0];
+        const coords: [number, number] = [parseFloat(best.lat as string), parseFloat(best.lon as string)];
         setCenter(coords);
         setUserPosition(coords);
-        setZoom(12);
+        const addr = best.address as Record<string, string> | undefined;
+        const isStreetLevel = best.type === "house" || best.type === "building" || addr?.house_number;
+        setZoom(isStreetLevel ? 16 : 13);
       }
     } catch {
       // geocoding failed silently

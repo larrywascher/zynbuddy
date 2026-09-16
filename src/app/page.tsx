@@ -13,6 +13,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<"list" | "map">("list");
+  const [locating, setLocating] = useState(false);
 
   const center = useMapStore((s) => s.center);
   const radius = useMapStore((s) => s.radius);
@@ -130,6 +131,22 @@ export default function Home() {
     setMobileView((prev) => (prev === "map" ? "list" : "map"));
   }, []);
 
+  const handleLocate = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setUserPosition(coords);
+        setCenter(coords);
+        setZoom(14);
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [setCenter, setZoom, setUserPosition]);
+
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
       <Header />
@@ -209,6 +226,8 @@ export default function Home() {
             userPosition={userPosition}
             isExpanded={mobileView === "map"}
             onToggleExpand={handleToggleExpand}
+            onLocate={handleLocate}
+            locating={locating}
           />
         </div>
       </div>

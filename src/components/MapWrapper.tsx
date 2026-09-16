@@ -23,8 +23,10 @@ interface MapWrapperProps {
   userPosition?: [number, number] | null;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  onLocate?: () => void;
+  locating?: boolean;
 }
 
-export default memo(function MapWrapper({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand }: MapWrapperProps) {
-  return <MapView stores={stores} onStoreSelect={onStoreSelect} onStoreCreated={onStoreCreated} userPosition={userPosition} isExpanded={isExpanded} onToggleExpand={onToggleExpand} />;
+export default memo(function MapWrapper({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand, onLocate, locating }: MapWrapperProps) {
+  return <MapView stores={stores} onStoreSelect={onStoreSelect} onStoreCreated={onStoreCreated} userPosition={userPosition} isExpanded={isExpanded} onToggleExpand={onToggleExpand} onLocate={onLocate} locating={locating} />;
 });

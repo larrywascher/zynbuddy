@@ -9,14 +9,13 @@ import {
   CircleMarker,
   Pane,
   useMap,
-  useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import type { StoreResult } from "@/lib/store";
 import { useMapStore, PRODUCT_OPTIONS } from "@/lib/store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, LocateFixed } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 function getPriceColor(price: number | null | undefined): string {
@@ -107,16 +106,75 @@ function MapUpdater() {
   return null;
 }
 
-function MapClickHandler({
-  onMapClick,
+function MapLongPressHandler({
+  onMapLongPress,
 }: {
-  onMapClick: (lat: number, lng: number) => void;
+  onMapLongPress: (lat: number, lng: number) => void;
 }) {
-  useMapEvents({
-    click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startPos = useRef<{ x: number; y: number } | null>(null);
+
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    const HOLD_MS = 500;
+    const MOVE_THRESHOLD = 10;
+
+    function onDown(e: MouseEvent | TouchEvent) {
+      const point = "touches" in e ? e.touches[0] : e;
+      startPos.current = { x: point.clientX, y: point.clientY };
+      timerRef.current = setTimeout(() => {
+        if (!startPos.current) return;
+        const latlng = map.containerPointToLatLng(
+          L.point(
+            startPos.current.x - container.getBoundingClientRect().left,
+            startPos.current.y - container.getBoundingClientRect().top
+          )
+        );
+        onMapLongPress(latlng.lat, latlng.lng);
+        startPos.current = null;
+      }, HOLD_MS);
+    }
+
+    function onMove(e: MouseEvent | TouchEvent) {
+      if (!startPos.current || !timerRef.current) return;
+      const point = "touches" in e ? e.touches[0] : e;
+      const dx = point.clientX - startPos.current.x;
+      const dy = point.clientY - startPos.current.y;
+      if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+        startPos.current = null;
+      }
+    }
+
+    function onUp() {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      startPos.current = null;
+    }
+
+    container.addEventListener("mousedown", onDown);
+    container.addEventListener("mousemove", onMove);
+    container.addEventListener("mouseup", onUp);
+    container.addEventListener("touchstart", onDown, { passive: true });
+    container.addEventListener("touchmove", onMove, { passive: true });
+    container.addEventListener("touchend", onUp);
+
+    return () => {
+      container.removeEventListener("mousedown", onDown);
+      container.removeEventListener("mousemove", onMove);
+      container.removeEventListener("mouseup", onUp);
+      container.removeEventListener("touchstart", onDown);
+      container.removeEventListener("touchmove", onMove);
+      container.removeEventListener("touchend", onUp);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [map, onMapLongPress]);
+
   return null;
 }
 
@@ -152,9 +210,11 @@ interface MapViewProps {
   userPosition?: [number, number] | null;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  onLocate?: () => void;
+  locating?: boolean;
 }
 
-export default function MapView({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand }: MapViewProps) {
+export default function MapView({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand, onLocate, locating }: MapViewProps) {
   const center = useMapStore((s) => s.center);
   const zoom = useMapStore((s) => s.zoom);
   const productTypes = useMapStore((s) => s.productTypes);
@@ -238,7 +298,7 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <MapUpdater />
-        {session && <MapClickHandler onMapClick={handleMapClick} />}
+        {session && <MapLongPressHandler onMapLongPress={handleMapClick} />}
 
         {userPosition && (
           <Pane name="user-position" style={{ zIndex: 700 }}>
@@ -345,7 +405,7 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
         {session && (
           <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
             <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
-              Tap map to add a store
+              Hold on map to add a store
             </p>
           </div>
         )}
@@ -363,6 +423,20 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
           </button>
         )}
       </div>
+
+      {onLocate && (
+        <button
+          onClick={onLocate}
+          className={`absolute bottom-4 right-4 z-[1000] p-2.5 rounded-xl shadow-lg border transition-all ${
+            locating
+              ? "bg-green-50 border-green-500 animate-pulse"
+              : "bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-700"
+          }`}
+          title="Go to my location"
+        >
+          <LocateFixed className={`h-5 w-5 ${locating ? "text-green-500" : "text-gray-600 dark:text-gray-300"}`} />
+        </button>
+      )}
     </div>
   );
 }
