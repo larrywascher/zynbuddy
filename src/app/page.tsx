@@ -13,33 +13,63 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<"list" | "map">("list");
-  const [userPosition, setUserPosition] = useState<[number, number] | null>(null);
-  const {
-    center,
-    radius,
-    maxPrice,
-    sortBy,
-    productTypes,
-    nicStrength,
-    onlyWithPrices,
-    setCenter,
-    setZoom,
-    mapBounds,
-  } = useMapStore();
+
+  const center = useMapStore((s) => s.center);
+  const radius = useMapStore((s) => s.radius);
+  const maxPrice = useMapStore((s) => s.maxPrice);
+  const sortBy = useMapStore((s) => s.sortBy);
+  const productTypes = useMapStore((s) => s.productTypes);
+  const nicStrength = useMapStore((s) => s.nicStrength);
+  const onlyWithPrices = useMapStore((s) => s.onlyWithPrices);
+  const mapBounds = useMapStore((s) => s.mapBounds);
+  const userPosition = useMapStore((s) => s.userPosition);
+  const setCenter = useMapStore((s) => s.setCenter);
+  const setZoom = useMapStore((s) => s.setZoom);
+  const setUserPosition = useMapStore((s) => s.setUserPosition);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-        setUserPosition(coords);
-        setCenter(coords);
-        setZoom(12);
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }, [setCenter, setZoom]);
+    let cancelled = false;
+
+    function tryGPS() {
+      if (!navigator.geolocation) {
+        fallbackToIP();
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          setUserPosition(coords);
+          setCenter(coords);
+          setZoom(12);
+        },
+        () => {
+          if (!cancelled) fallbackToIP();
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    async function fallbackToIP() {
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.country_code === "US" && data.latitude && data.longitude) {
+          const coords: [number, number] = [data.latitude, data.longitude];
+          setUserPosition(coords);
+          setCenter(coords);
+          setZoom(12);
+        }
+      } catch {
+        // IP geolocation failed silently
+      }
+    }
+
+    tryGPS();
+    return () => { cancelled = true; };
+  }, [setCenter, setZoom, setUserPosition]);
 
   const fetchStores = useCallback(async () => {
     setLoading(true);
@@ -89,12 +119,16 @@ export default function Home() {
     ? stores.filter((s) => isInBounds(s, mapBounds))
     : stores;
 
-  function handleStoreSelect(store: StoreResult) {
+  const handleStoreSelect = useCallback((store: StoreResult) => {
     setSelectedStoreId(store.id);
     setCenter([store.latitude, store.longitude]);
     setZoom(15);
     setMobileView("map");
-  }
+  }, [setCenter, setZoom]);
+
+  const handleToggleExpand = useCallback(() => {
+    setMobileView((prev) => (prev === "map" ? "list" : "map"));
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
@@ -174,7 +208,7 @@ export default function Home() {
             onStoreCreated={fetchStores}
             userPosition={userPosition}
             isExpanded={mobileView === "map"}
-            onToggleExpand={() => setMobileView(mobileView === "map" ? "list" : "map")}
+            onToggleExpand={handleToggleExpand}
           />
         </div>
       </div>

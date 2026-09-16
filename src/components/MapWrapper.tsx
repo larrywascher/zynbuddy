@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import dynamic from "next/dynamic";
 import type { StoreResult } from "@/lib/store";
 
@@ -24,6 +25,6 @@ interface MapWrapperProps {
   onToggleExpand?: () => void;
 }
 
-export default function MapWrapper({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand }: MapWrapperProps) {
+export default memo(function MapWrapper({ stores, onStoreSelect, onStoreCreated, userPosition, isExpanded, onToggleExpand }: MapWrapperProps) {
   return <MapView stores={stores} onStoreSelect={onStoreSelect} onStoreCreated={onStoreCreated} userPosition={userPosition} isExpanded={isExpanded} onToggleExpand={onToggleExpand} />;
-}
+});

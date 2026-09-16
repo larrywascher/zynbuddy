@@ -17,6 +17,7 @@ interface MapState {
   nicStrength: string;
   onlyWithPrices: boolean;
   mapBounds: MapBounds | null;
+  userPosition: [number, number] | null;
   setCenter: (center: [number, number]) => void;
   setZoom: (zoom: number) => void;
   setRadius: (radius: number) => void;
@@ -26,6 +27,7 @@ interface MapState {
   setNicStrength: (strength: string) => void;
   setOnlyWithPrices: (v: boolean) => void;
   setMapBounds: (bounds: MapBounds) => void;
+  setUserPosition: (pos: [number, number] | null) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -38,6 +40,7 @@ export const useMapStore = create<MapState>((set) => ({
   nicStrength: "",
   onlyWithPrices: false,
   mapBounds: null,
+  userPosition: null,
   setCenter: (center) => set({ center }),
   setZoom: (zoom) => set({ zoom }),
   setRadius: (radius) => set({ radius }),
@@ -46,7 +49,16 @@ export const useMapStore = create<MapState>((set) => ({
   setProductTypes: (productTypes) => set({ productTypes }),
   setNicStrength: (nicStrength) => set({ nicStrength }),
   setOnlyWithPrices: (onlyWithPrices) => set({ onlyWithPrices }),
-  setMapBounds: (mapBounds) => set({ mapBounds }),
+  setMapBounds: (bounds) => {
+    const prev = useMapStore.getState().mapBounds;
+    if (prev &&
+        prev.minLat === bounds.minLat && prev.maxLat === bounds.maxLat &&
+        prev.minLng === bounds.minLng && prev.maxLng === bounds.maxLng) {
+      return;
+    }
+    set({ mapBounds: bounds });
+  },
+  setUserPosition: (userPosition) => set({ userPosition }),
 }));
 
 export interface StoreResult {

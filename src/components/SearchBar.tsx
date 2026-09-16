@@ -8,22 +8,21 @@ export default function SearchBar() {
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [locating, setLocating] = useState(false);
-  const {
-    radius,
-    maxPrice,
-    sortBy,
-    productTypes,
-    nicStrength,
-    onlyWithPrices,
-    setCenter,
-    setRadius: setRadiusRaw,
-    setMaxPrice,
-    setSortBy,
-    setZoom,
-    setProductTypes,
-    setNicStrength,
-    setOnlyWithPrices,
-  } = useMapStore();
+  const radius = useMapStore((s) => s.radius);
+  const maxPrice = useMapStore((s) => s.maxPrice);
+  const sortBy = useMapStore((s) => s.sortBy);
+  const productTypes = useMapStore((s) => s.productTypes);
+  const nicStrength = useMapStore((s) => s.nicStrength);
+  const onlyWithPrices = useMapStore((s) => s.onlyWithPrices);
+  const setCenter = useMapStore((s) => s.setCenter);
+  const setRadiusRaw = useMapStore((s) => s.setRadius);
+  const setMaxPrice = useMapStore((s) => s.setMaxPrice);
+  const setSortBy = useMapStore((s) => s.setSortBy);
+  const setZoom = useMapStore((s) => s.setZoom);
+  const setProductTypes = useMapStore((s) => s.setProductTypes);
+  const setNicStrength = useMapStore((s) => s.setNicStrength);
+  const setOnlyWithPrices = useMapStore((s) => s.setOnlyWithPrices);
+  const setUserPosition = useMapStore((s) => s.setUserPosition);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +43,9 @@ export default function SearchBar() {
       const results = await res.json();
       if (results.length > 0) {
         const { lat, lon } = results[0];
-        setCenter([parseFloat(lat), parseFloat(lon)]);
+        const coords: [number, number] = [parseFloat(lat), parseFloat(lon)];
+        setCenter(coords);
+        setUserPosition(coords);
         setZoom(12);
       }
     } catch {
@@ -57,7 +58,9 @@ export default function SearchBar() {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCenter([pos.coords.latitude, pos.coords.longitude]);
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setCenter(coords);
+        setUserPosition(coords);
         setZoom(12);
         setLocating(false);
       },

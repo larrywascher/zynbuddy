@@ -15,6 +15,7 @@ import L from "leaflet";
 import type { StoreResult } from "@/lib/store";
 import { useMapStore, PRODUCT_OPTIONS } from "@/lib/store";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -75,14 +76,22 @@ function MapUpdater() {
   const center = useMapStore((s) => s.center);
   const zoom = useMapStore((s) => s.zoom);
   const setMapBounds = useMapStore((s) => s.setMapBounds);
+  const prevBoundsKey = useRef("");
+  const prevViewKey = useRef("");
 
   useEffect(() => {
+    const key = `${center[0]},${center[1]},${zoom}`;
+    if (key === prevViewKey.current) return;
+    prevViewKey.current = key;
     map.setView(center, zoom);
   }, [map, center, zoom]);
 
   useEffect(() => {
     function updateBounds() {
       const b = map.getBounds();
+      const key = `${b.getSouth().toFixed(6)},${b.getNorth().toFixed(6)},${b.getWest().toFixed(6)},${b.getEast().toFixed(6)}`;
+      if (key === prevBoundsKey.current) return;
+      prevBoundsKey.current = key;
       setMapBounds({
         minLat: b.getSouth(),
         maxLat: b.getNorth(),
@@ -150,10 +159,10 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
   const zoom = useMapStore((s) => s.zoom);
   const productTypes = useMapStore((s) => s.productTypes);
   const { data: session } = useSession();
+  const router = useRouter();
   const [clickedPos, setClickedPos] = useState<[number, number] | null>(null);
   const [geocoding, setGeocoding] = useState(false);
   const [geoData, setGeoData] = useState({ name: "", address: "", city: "", state: "", zip: "" });
-  const [pricePerCan, setPricePerCan] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const markerRef = useRef<L.Marker>(null);
@@ -162,7 +171,6 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
     if (!session) return;
     setClickedPos([lat, lng]);
     setMessage("");
-    setPricePerCan("");
     setGeocoding(true);
     setGeoData({ name: "", address: "", city: "", state: "", zip: "" });
 
@@ -193,19 +201,16 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
         latitude: clickedPos[0],
         longitude: clickedPos[1],
         storeType: "GAS_STATION",
-        productType: "ZYN",
-        productBrand: "Zyn",
-        pricePerCan,
       }),
     });
 
     setSubmitting(false);
     if (res.ok) {
-      setMessage("Store added! +50 points");
+      const newStore = await res.json();
       setClickedPos(null);
-      setPricePerCan("");
       setGeoData({ name: "", address: "", city: "", state: "", zip: "" });
       onStoreCreated?.();
+      router.push(`/store/${newStore.id}`);
     } else {
       const data = await res.json();
       setMessage(data.error || "Failed to add store");
@@ -310,27 +315,13 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
                       <p className="text-gray-500">{geoData.address || `${clickedPos[0].toFixed(4)}, ${clickedPos[1].toFixed(4)}`}</p>
                       {geoData.city && <p className="text-gray-500">{geoData.city}{geoData.state ? `, ${geoData.state}` : ""} {geoData.zip}</p>}
                     </div>
-                    <div className="pt-1">
-                      <label className="text-[10px] font-semibold text-gray-500 uppercase">Price per can ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        max="100"
-                        placeholder="e.g. 5.49"
-                        value={pricePerCan}
-                        onChange={(e) => setPricePerCan(e.target.value)}
-                        required
-                        className="w-full px-2 py-1.5 text-sm border rounded mt-0.5 font-medium"
-                        autoFocus
-                      />
-                    </div>
+                    <p className="text-[10px] text-gray-400">You&apos;ll add prices on the next page.</p>
                     <button
                       type="submit"
                       disabled={submitting}
                       className="w-full px-2 py-1.5 bg-purple-600 text-white text-xs rounded font-medium hover:bg-purple-700 disabled:opacity-50"
                     >
-                      {submitting ? "Adding..." : "Add Store (+50 pts)"}
+                      {submitting ? "Adding..." : "Add Store & Report Price"}
                     </button>
                   </form>
                 )}
