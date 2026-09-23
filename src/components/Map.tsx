@@ -294,8 +294,8 @@ export default function MapView({ stores, onStoreSelect, onStoreCreated, userPos
         style={{ minHeight: "300px" }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
+          url="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png"
         />
         <MapUpdater />
         {session && <MapLongPressHandler onMapLongPress={handleMapClick} />}
