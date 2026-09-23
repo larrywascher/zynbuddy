@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",
+    "@protomaps/basemaps": "^5.7.2",
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.4.2",
     "leaflet": "^1.9.4",
@@ -20,6 +21,8 @@
     "maplibre-gl": "^4.7.1",
     "next": "16.3.5",
     "next-auth": "^5.0.0-beta.25",
+    "pmtiles": "^4.5.0",
+    "protomaps-themes-base": "^4.5.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-leaflet": "^5.0.0",
