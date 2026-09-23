@@ -80,6 +80,9 @@ export default function MapView({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressStart = useRef<{ x: number; y: number } | null>(null);
   const openPopupStoreId = useRef<string | null>(null);
+  const suppressPopupClose = useRef(false);
+  const loginPopupRef = useRef<maplibregl.Popup | null>(null);
+  const longPressHandlerRef = useRef<(lat: number, lng: number) => void>(() => {});
 
   const [clickedPos, setClickedPos] = useState<[number, number] | null>(null);
   const [geocoding, setGeocoding] = useState(false);
@@ -170,9 +173,52 @@ export default function MapView({
     map.current.flyTo({ center: [center[1], center[0]], zoom, duration: 800 });
   }, [center, zoom]);
 
-  // Long press handler
+  // Keep long-press handler ref current (avoids stale closures)
   useEffect(() => {
-    if (!map.current || !session) return;
+    longPressHandlerRef.current = async (lat: number, lng: number) => {
+      if (loginPopupRef.current) {
+        loginPopupRef.current.remove();
+        loginPopupRef.current = null;
+      }
+
+      if (!session) {
+        if (!map.current) return;
+        const popupNode = document.createElement("div");
+        popupNode.style.cssText = "font-family:system-ui;text-align:center;padding:4px 0";
+
+        const msg = document.createElement("p");
+        msg.textContent = "Sign in to add a store";
+        msg.style.cssText = "font-size:12px;font-weight:600;color:#1f2937;margin:0 0 8px";
+        popupNode.appendChild(msg);
+
+        const link = document.createElement("a");
+        link.href = "/auth/signin";
+        link.textContent = "Sign In";
+        link.style.cssText =
+          "display:inline-block;padding:6px 16px;background:#16a34a;color:white;font-size:11px;font-weight:600;border-radius:6px;text-decoration:none";
+        popupNode.appendChild(link);
+
+        const popup = new maplibregl.Popup({ offset: 0, maxWidth: "200px" })
+          .setLngLat([lng, lat])
+          .setDOMContent(popupNode)
+          .addTo(map.current);
+        loginPopupRef.current = popup;
+        return;
+      }
+
+      setClickedPos([lat, lng]);
+      setMessage("");
+      setGeocoding(true);
+      setGeoData({ name: "", address: "", city: "", state: "", zip: "" });
+      const geo = await reverseGeocode(lat, lng);
+      setGeoData(geo);
+      setGeocoding(false);
+    };
+  }, [session]);
+
+  // Long press handler — always active for all users
+  useEffect(() => {
+    if (!map.current) return;
     const m = map.current;
     const canvas = m.getCanvasContainer();
     const HOLD_MS = 500;
@@ -188,7 +234,7 @@ export default function MapView({
           longPressStart.current.x - rect.left,
           longPressStart.current.y - rect.top,
         ]);
-        handleMapLongPress(lngLat.lat, lngLat.lng);
+        longPressHandlerRef.current(lngLat.lat, lngLat.lng);
         longPressStart.current = null;
       }, HOLD_MS);
     }
@@ -229,30 +275,19 @@ export default function MapView({
       canvas.removeEventListener("touchend", onUp);
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
     };
-  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleMapLongPress = useCallback(
-    async (lat: number, lng: number) => {
-      if (!session) return;
-      setClickedPos([lat, lng]);
-      setMessage("");
-      setGeocoding(true);
-      setGeoData({ name: "", address: "", city: "", state: "", zip: "" });
-      const geo = await reverseGeocode(lat, lng);
-      setGeoData(geo);
-      setGeocoding(false);
-    },
-    [session]
-  );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // New-store marker + popup
   useEffect(() => {
     if (!map.current) return;
 
+    suppressPopupClose.current = true;
     if (newStoreMarkerRef.current) {
       newStoreMarkerRef.current.remove();
       newStoreMarkerRef.current = null;
     }
+    suppressPopupClose.current = false;
+
     if (!clickedPos) return;
 
     const el = document.createElement("div");
@@ -328,6 +363,7 @@ export default function MapView({
 
     const popup = new maplibregl.Popup({ offset: 20, maxWidth: "260px" }).setDOMContent(popupNode);
     popup.on("close", () => {
+      if (suppressPopupClose.current) return;
       setClickedPos(null);
       setGeoData({ name: "", address: "", city: "", state: "", zip: "" });
       setMessage("");
@@ -394,7 +430,6 @@ export default function MapView({
       el.addEventListener("click", () => {
         onStoreSelect(store);
         openPopupStoreId.current = store.id;
-        marker.togglePopup();
       });
 
       if (reopenId === store.id) {
@@ -442,13 +477,11 @@ export default function MapView({
       />
 
       <div className="absolute top-3 right-14 z-10 flex items-center gap-2">
-        {session && (
-          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
-              Hold on map to add a store
-            </p>
-          </div>
-        )}
+        <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl px-3 py-2 shadow-lg border border-gray-200/50 dark:border-gray-700/50">
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+            Hold on map to add a store
+          </p>
+        </div>
         {onToggleExpand && (
           <button
             onClick={onToggleExpand}
